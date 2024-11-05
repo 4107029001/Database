@@ -17,6 +17,8 @@
 // INCLUDE YOUR LOGGING FILE HERE
 #include "betree.hpp"
 
+#include "logger.hpp"
+
 void timer_start(uint64_t &timer) {
     struct timeval t;
     assert(!gettimeofday(&t, NULL));
@@ -397,8 +399,11 @@ int main(int argc, char **argv) {
     //ofpobs.reset_ids();
 
     swap_space sspace(&ofpobs, cache_size);
-    betree<uint64_t, std::string> b(&sspace, max_node_size, min_flush_size);
 
+    Logger logger(&ofpobs, persistence_granularity); // Initialze Logger here
+
+    betree<uint64_t, std::string> b(&sspace, &logger, max_node_size, min_flush_size); // Add Logger pointer in betree constuctor
+    
     /**
      * STUDENTS: INITIALIZE YOUR CLASS HERE
      *
@@ -412,6 +417,8 @@ int main(int argc, char **argv) {
      *           note why.
      *
      */
+    std::cout << "Starting test program..." << std::endl;
+
 
     if (strcmp(mode, "test") == 0)
         test(b, nops, number_of_distinct_keys, script_input, script_output);
@@ -434,3 +441,32 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+// Test for running a minimal set of operations
+// int main(int argc, char **argv) {
+//     std::cout << "Starting the minimal test function..." << std::endl << std::flush;
+
+//     // Set up minimal parameters
+//     const uint64_t min_granularity = 2;
+//     const uint64_t max_node_size = 16;
+//     const uint64_t min_flush_size = 4;
+    
+//     // std::cout << "Initializing directory..." << std::endl << std::flush;
+//     one_file_per_object_backing_store ofpobs("/home/u1480041/CS6350Proj3/temp_dir");
+//     // std::cout << "Initializing classes..." << std::endl << std::flush;
+//     swap_space sspace(&ofpobs, 4);
+//     Logger logger(&ofpobs, min_granularity);
+//     betree<uint64_t, std::string> b(&sspace, &logger, max_node_size, min_flush_size);
+//     // std::cout << "Initializing Logger..." << std::endl << std::flush;
+    
+//     // std::cout << "Logger Class has been set up..." << std::endl << std::flush;
+    
+//     // std::cout << "Minimal test: inserting, updating, and querying..." << std::endl;
+    
+//     b.insert(1, "test_value");
+//     b.update(1, "_updated");
+//     std::string result = b.query(1);
+//     std::cout << "Query result for key 1: " << result << std::endl;
+
+//     return 0;
+// }
