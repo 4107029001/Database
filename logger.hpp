@@ -9,7 +9,7 @@
 class Logger {
 public:
     Logger(backing_store* storage, uint64_t persistence_granularity)
-        : storage(storage), persistence_granularity(persistence_granularity), log_count(0) {
+        : storage(storage), persistence_granularity(persistence_granularity), log_count(0), lsn(0) {
         log_stream.open("wal_log.txt", std::ios::out | std::ios::app);  // file handling
         if (!log_stream.is_open()) {
             std::cerr << "Failed to open log file for WAL" << std::endl;
@@ -45,16 +45,21 @@ public:
 private:
     // Function to log any entry and handle persistence
     void log_entry(const std::string& operation, uint64_t key, const std::string& value) {
+        lsn ++; // Increase LSN for each transaction
+
         if (!log_stream.is_open()) {
             std::cerr << "log_stream is not open!" << std::endl;
             return;  // Exit if log_stream isn't open to avoid segmentation faults
         }
 
-        log_stream << operation << " " << key;
+        log_stream << lsn << ":" << operation << " " << key;
+        
         if (!value.empty()) {
             log_stream << " " << value;
         }
+
         log_stream << std::endl;
+
         log_count++;
 
         // Persist if log count reaches persistence granularity
@@ -67,7 +72,7 @@ private:
     void persist() {
         std::cerr << "Persisting log to disk..." << std::endl;
         if (!log_stream.is_open() || log_stream.bad()) {
-            std::cerr << "Cannot persist: log_stream is not in a good state" << std::endl;
+            std::cerr << "Cannot persist" << std::endl;
             return;
         }
         log_stream.flush();
@@ -80,6 +85,7 @@ private:
     std::ofstream log_stream;
     uint64_t persistence_granularity;
     uint64_t log_count;
+    uint64_t lsn;
 };
 
 #endif // LOGGER_HPP
