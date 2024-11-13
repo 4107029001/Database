@@ -24,36 +24,39 @@ public:
         }
     }
 
-    // Log for insert
-    void log_insert(uint64_t key, const std::string& value) {
-        std::cout << "Log Inserting..." << std::endl;
-        log_entry("INSERT", key, value);
-    }
+    // // Log for insert
+    // void log_insert(uint64_t key, const std::string& value) {
+    //     std::cout << "Log Inserting..." << std::endl;
+    //     log_entry("INSERT", key, value);
+    // }
 
-    // Log for update
-    void log_update(uint64_t key, const std::string& value) {
-        std::cout << "Log Updating..." << std::endl;
-        log_entry("UPDATE", key, value);
-    }
+    // // Log for update
+    // void log_update(uint64_t key, const std::string& value) {
+    //     std::cout << "Log Updating..." << std::endl;
+    //     log_entry("UPDATE", key, value);
+    // }
 
-    // Log for delete
-    void log_delete(uint64_t key) {
-        std::cout << "Log Deleting..." << std::endl;
-        log_entry("DELETE", key, "");
-    }
+    // // Log for delete
+    // void log_delete(uint64_t key) {
+    //     std::cout << "Log Deleting..." << std::endl;
+    //     log_entry("DELETE", key, "");
+    // }
+    void log_operation(int opcode, uint64_t key, const std::string& value){
+        lsn ++;
 
-private:
-    // Function to log any entry and handle persistence
-    void log_entry(const std::string& operation, uint64_t key, const std::string& value) {
-        lsn ++; // Increase LSN for each transaction
-
-        if (!log_stream.is_open()) {
-            std::cerr << "log_stream is not open!" << std::endl;
-            return;  // Exit if log_stream isn't open to avoid segmentation faults
+        if (!log_stream.is_open()){
+            std::cerr << "Logging file is not open!" << std::endl;
+            return;
+        }
+        // Logging operation type
+        log_stream << lsn << ":";
+        switch (opcode) {
+            case 0: log_stream << "INSERT "; break;
+            case 1: log_stream << "DELETE "; break;
+            case 2: log_stream << "UPDATE "; break;
         }
 
-        log_stream << lsn << ":" << operation << " " << key;
-        
+        log_stream << key;
         if (!value.empty()) {
             log_stream << " " << value;
         }
@@ -64,10 +67,11 @@ private:
 
         // Persist if log count reaches persistence granularity
         if (log_count >= persistence_granularity) {
-            persist();
+            persist(); 
         }
     }
 
+private:
     // Flush the log file to disk
     void persist() {
         std::cerr << "Persisting log to disk..." << std::endl;

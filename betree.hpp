@@ -670,9 +670,16 @@ public:
   // 4. If flush results in new nodes, updates the root with the new pivots
   void upsert(int opcode, Key k, Value v)
   {
+    if (logger){
+      logger->log_operation(opcode, k, v);
+    } else {
+      std::cerr << "Logger has not been initialized" << std::endl;
+    }
+
     message_map tmp;
     tmp[MessageKey<Key>(k, next_timestamp++)] = Message<Value>(opcode, v);
     pivot_map new_nodes = root->flush(*this, tmp);
+
     if (new_nodes.size() > 0) {
       root = ss->allocate(new node);
       root->pivots = new_nodes;
@@ -681,31 +688,16 @@ public:
 
   void insert(Key k, Value v)
   {
-    if (logger) {
-        logger->log_insert(k, v);
-    } else {
-        std::cerr << "Logger is not initialized!" << std::endl;
-    }
     upsert(INSERT, k, v);
   }
 
   void update(Key k, Value v)
   {
-    if (logger) {
-        logger->log_update(k, v);
-    } else {
-        std::cerr << "Logger is not initialized!" << std::endl;
-    }
     upsert(UPDATE, k, v);
   }
 
   void erase(Key k)
   {
-    if (logger) {
-        logger->log_delete(k);
-    } else {
-        std::cerr << "Logger is not initialized!" << std::endl;
-    }
     upsert(DELETE, k, default_value);
   }
   
