@@ -8,8 +8,13 @@
 
 class Logger {
 public:
-    Logger(backing_store* storage, uint64_t persistence_granularity)
-        : storage(storage), persistence_granularity(persistence_granularity), log_count(0), lsn(0) {
+    Logger(backing_store* storage, uint64_t persistence_granularity, uint64_t checkpoint_granularity)
+        : storage(storage), 
+          persistence_granularity(persistence_granularity), 
+          log_count(0), 
+          lsn(0),
+          checkpoint_granularity(checkpoint_granularity),
+          operations_after_last_checkpoint(0) {
         log_stream.open("wal_log.txt", std::ios::out | std::ios::app);  // file handling
         if (!log_stream.is_open()) {
             std::cerr << "Failed to open log file for WAL" << std::endl;
@@ -24,23 +29,6 @@ public:
         }
     }
 
-    // // Log for insert
-    // void log_insert(uint64_t key, const std::string& value) {
-    //     std::cout << "Log Inserting..." << std::endl;
-    //     log_entry("INSERT", key, value);
-    // }
-
-    // // Log for update
-    // void log_update(uint64_t key, const std::string& value) {
-    //     std::cout << "Log Updating..." << std::endl;
-    //     log_entry("UPDATE", key, value);
-    // }
-
-    // // Log for delete
-    // void log_delete(uint64_t key) {
-    //     std::cout << "Log Deleting..." << std::endl;
-    //     log_entry("DELETE", key, "");
-    // }
     void log_operation(int opcode, uint64_t key, const std::string& value){
         lsn ++;
 
@@ -64,12 +52,54 @@ public:
         log_stream << std::endl;
 
         log_count++;
+        operations_after_last_checkpoint++;
 
         // Persist if log count reaches persistence granularity
         if (log_count >= persistence_granularity) {
             persist(); 
         }
     }
+
+    bool need_checkpoint() const {
+        return operations_after_last_checkpoint >= checkpoint_granularity;
+    }
+
+    uint64_t get_current_lsn() const {
+        return lsn;
+    }
+
+    void checkpoint(uint64_t lsn) {
+        log_stream << "Checkpoint at" << lsn << std::endl;
+        log_stream.flush();
+
+        // Update master record
+        update_master_record(lsn);
+
+        // Truncate log file
+        if (log_stream.is_open()){
+            log_stream.close(); // close to change mode
+        }
+
+        log_stream.open("wal_log.txt", std::ios::out | std::ios::trunc);
+        if (!log_stream.is_open()) {
+            std::cerr << "Failed to open wal_log.txt" << std::endl;
+            exit(1);
+        }
+        // Reset the operation after checkpoint
+        operations_after_last_checkpoint = 0;
+    }
+
+    // Function to update master record, master record should be in disk
+    void update_master_record(uint64_t lsn) {
+        std::ofstream master_record("master_record.txt", std::ios::out | std::ios::trunc);
+        if (!master_record.is_open()) {
+            std::cerr << "Failed to access master record from disk" << std::endl;
+            exit(1);
+        }
+        master_record << lsn << std::endl;
+        master_record.close();
+    }
+
 
 private:
     // Flush the log file to disk
@@ -90,6 +120,8 @@ private:
     uint64_t persistence_granularity;
     uint64_t log_count;
     uint64_t lsn;
+    uint64_t checkpoint_granularity;
+    uint64_t operations_after_last_checkpoint;
 };
 
 #endif // LOGGER_HPP

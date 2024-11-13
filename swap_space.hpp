@@ -170,7 +170,10 @@ template<class X> void deserialize(std::iostream &fs, serialization_context &con
 
 class swap_space {
 public:
-  swap_space(backing_store *bs, uint64_t n);
+  swap_space(backing_store *bs, uint64_t n, uint64_t checkpoint_granularity);
+
+  void checkpoint();
+  void deallocate_old_versions();
 
   template<class Referent> class pointer;
 
@@ -221,8 +224,8 @@ public:
 
     pin &operator=(const pin &other) {
       if (&other != this) {
-	unpin();
-	dopin(other.ss, other.target);
+        unpin();
+        dopin(other.ss, other.target);
       }
     }
     
@@ -425,6 +428,7 @@ private:
 
   uint64_t next_id = 1;
   uint64_t next_access_time = 0;
+
   
   class object {
   public:
@@ -439,6 +443,7 @@ private:
     uint64_t last_access;
     bool target_is_dirty;
     uint64_t pincount;
+    uint64_t old_version; // This is for copy on write
   };
 
   static bool cmp_by_last_access(object *a, object *b);
@@ -470,6 +475,7 @@ private:
   uint64_t max_in_memory_objects;
   uint64_t current_in_memory_objects = 0;
 
+  uint64_t checkpoint_granularity;
 
   //structs used in ss
   //objects is a map from targets->objects (target == obj->id)

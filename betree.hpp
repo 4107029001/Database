@@ -177,7 +177,8 @@ bool operator==(const Message<Value> &a, const Message<Value> &b) {
 #define DEFAULT_MIN_FLUSH_SIZE (DEFAULT_MAX_NODE_SIZE / 16ULL)
 
 
-template<class Key, class Value> class betree {
+template<class Key, class Value> 
+class betree {
 private:
 
   class node; // node in the betree
@@ -647,6 +648,7 @@ private:
   Value default_value;
   
 public:
+  void checkpoint();
   betree(swap_space *sspace,
    Logger* logger_ptr,
 	 uint64_t maxnodesize = DEFAULT_MAX_NODE_SIZE,
@@ -660,6 +662,19 @@ public:
     
   {
     root = ss->allocate(new node);
+  }
+
+  void do_checkpoint() {
+    // 1.Flush dirty objects inside swap_space to disk
+    // 2.Write "Checkpoint at <lsn>" to the log file, 
+    // 3.Update master record
+    // 4.Truncate the log file
+    // 5.Deallocate old versions of dirty objects
+ 
+    ss->checkpoint();
+    uint64_t current_lsn = logger->get_current_lsn();
+    logger->checkpoint(current_lsn);
+    ss->deallocate_old_versions();
   }
 
   // Insert the specified message and handle a split of the root if it
@@ -683,6 +698,10 @@ public:
     if (new_nodes.size() > 0) {
       root = ss->allocate(new node);
       root->pivots = new_nodes;
+    }
+
+    if (logger->need_checkpoint()) {
+      do_checkpoint();
     }
   }
 

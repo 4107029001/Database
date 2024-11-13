@@ -398,9 +398,9 @@ int main(int argc, char **argv) {
 
     //ofpobs.reset_ids();
 
-    swap_space sspace(&ofpobs, cache_size);
+    swap_space sspace(&ofpobs, cache_size, checkpoint_granularity);
 
-    Logger logger(&ofpobs, persistence_granularity); // Initialze Logger here
+    Logger logger(&ofpobs, persistence_granularity, checkpoint_granularity); // Initialze Logger here
 
     betree<uint64_t, std::string> b(&sspace, &logger, max_node_size, min_flush_size); // Add Logger pointer in betree constuctor
     

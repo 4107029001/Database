@@ -53,9 +53,10 @@ bool swap_space::cmp_by_last_access(swap_space::object *a, swap_space::object *b
   return a->last_access < b->last_access;
 }
 
-swap_space::swap_space(backing_store *bs, uint64_t n) :
+swap_space::swap_space(backing_store *bs, uint64_t n, uint64_t checkpoint_granularity) :
   backstore(bs),
   max_in_memory_objects(n),
+  checkpoint_granularity(checkpoint_granularity),
   objects(),
   lru_pqueue(cmp_by_last_access)
 {}
@@ -71,6 +72,7 @@ swap_space::object::object(swap_space *sspace, serializable * tgt) {
   last_access = sspace->next_access_time++;
   target_is_dirty = true;
   pincount = 0;
+  old_version = 0;
 }
 
 //set # of items that can live in ss.
@@ -115,8 +117,9 @@ void swap_space::write_back(swap_space::object *obj)
     backstore->put(out);
 
     //version 0 is the flag that the object exists only in memory.
-    if (obj->version > 0)
-      backstore->deallocate(obj->id, obj->version);
+    // if (obj->version > 0)
+    //   backstore->deallocate(obj->id, obj->version); // Don't want to deallocate the old version immediately
+    obj->old_version = obj->version; // Store the old version
     obj->version = new_version_id;
     obj->target_is_dirty = false;
   }
@@ -144,6 +147,30 @@ void swap_space::maybe_evict_something(void)
     delete obj->target;
     obj->target = NULL;
     current_in_memory_objects--;
+  }
+}
+
+// Flush the dirty objects in swap_space back to disk
+void swap_space::checkpoint(){
+  for (auto it=objects.begin(); it!=objects.end(); ++it) {
+    object *obj = it->second;
+    if (obj->target_is_dirty) {
+      lru_pqueue.erase(obj);
+      write_back(obj);
+      delete obj->target;
+      obj->target = NULL;
+      current_in_memory_objects--;
+    }
+  }
+}
+
+void swap_space::deallocate_old_versions() {
+  for (auto it=objects.begin(); it!=objects.end(); ++it) {
+    object *obj = it->second;
+    if (obj->old_version>0) {
+      backstore->deallocate(obj->id, obj->old_version);
+      obj->old_version = 0;
+    }
   }
 }
 
